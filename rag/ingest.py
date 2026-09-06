@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 from pathlib import Path
 import chromadb
@@ -40,20 +40,26 @@ def get_embedding(text: str) -> list:
 def main():
     current_dir = Path(__file__).parent.resolve()
     docs_dir = current_dir / "docs"
+    product_dir = docs_dir / "product"
 
     if not docs_dir.exists():
         print(f"ERROR: Docs directory not found at {docs_dir}")
         sys.exit(1)
 
-    md_files = sorted(list(docs_dir.glob("*.md")))
-    print(f"Found {len(md_files)} markdown document(s) in '{docs_dir.name}/'")
+    # 1. Collect metric docs (direct children of docs/)
+    metric_files = sorted([f for f in docs_dir.glob("*.md") if f.is_file()])
+    # 2. Collect product docs (children of docs/product/)
+    product_files = sorted([f for f in product_dir.glob("*.md") if f.is_file()]) if product_dir.exists() else []
+
+    all_files = [("metric", f) for f in metric_files] + [("product", f) for f in product_files]
+    print(f"Found {len(metric_files)} metric doc(s) and {len(product_files)} product doc(s) (total: {len(all_files)})")
 
     documents = []
     metadatas = []
     ids = []
     embeddings = []
 
-    for file_path in md_files:
+    for category, file_path in all_files:
         source_name = file_path.stem
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -63,12 +69,15 @@ def main():
                 print(f"Skipping empty file: {file_path.name}")
                 continue
 
-            print(f"Generating embedding for '{source_name}' ({len(content.split())} words)...")
+            print(f"Generating embedding for [{category}] '{source_name}' ({len(content.split())} words)...")
             embedding = get_embedding(content)
 
             documents.append(content)
-            metadatas.append({"source": source_name})
-            ids.append(f"doc_{source_name}")
+            metadatas.append({
+                "source": source_name,
+                "category": category
+            })
+            ids.append(f"doc_{category}_{source_name}")
             embeddings.append(embedding)
 
         except Exception as e:
